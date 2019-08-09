@@ -3,60 +3,33 @@
 """
 Created on Mon Aug  5 10:14:06 2019
 
-@author: carinnel
+@author: Ty Lazarchik
 """
-
-from mesa.visualization.modules import CanvasGrid
-from mesa.visualization.ModularVisualization import ModularServer
-from mesa.visualization.modules import ChartModule
 from ModelDef import TransModel
 from tqdm import tqdm
 
-def agentPortrayal(agent):
-    portrayal = {'Shape': 'circle',
-                 'Filled': 'true',
-                 'Layer': 0,
-                 'r': 0.5}
+transits = []
+pfhs = []
+times = []
+moneys = []
+
+for j in tqdm(range(10)):
+    # run the model
+    model = TransModel(100, 60, 48) 
+    for i in range(6):
+        model.step()
     
-    if agent.choice == 1:
-        portrayal['Color'] = 'red'
-    else:
-        portrayal['Color'] = 'blue'
-    
-    return portrayal
+    percs = model.datacollector.get_model_vars_dataframe()
+    agentVals = model.datacollector.get_agent_vars_dataframe()
+    transits.append(percs['Transit'][1:].mean())
+    pfhs.append(percs['PfH'][1:].mean())
+    times.append(agentVals['Time'][1:].mean())
+    moneys.append(agentVals['Money'][1:].mean())
 
-# =============================================================================
-# model = TransModel(100, 60, 48) 
-# averages = []
-# 
-# for i in tqdm(range(10)):
-#     for j in range(10):
-#         model.step()
-#         # print('step', j, 'round', i)
-#     
-#     transit = model.datacollector.get_model_vars_dataframe()
-#     averages.append(transit['Percent'].mean())
-# 
-# print('\n')
-# # =============================================================================
-# # for i in range(len(averages)):
-# #     print(i + 1, averages[i])
-# # =============================================================================
-# 
-# print(round(sum(averages) / len(averages), 2))
-# =============================================================================
-    
-
-grid = CanvasGrid(agentPortrayal, 60, 48, 500, 500)
-
-chart = ChartModule([{'Label': 'Percent',
-                      'Color': 'Black'}],
-                    data_collector_name = 'datacollector')
-
-server = ModularServer(TransModel,
-                       [grid, chart],
-                       'Transport Model',
-                       {'N': 500, 'width': 60, 'height': 48})
-server.port = 8521
-server.launch()
+# to be later changed to write to a file
+print('\n')
+print('percent taking transit:', round(sum(transits) / len(transits), 2))
+print('percent taking pfh:', round(sum(pfhs) / len(pfhs), 2))
+print('avg time left:', round(sum(times) / len(times), 2))
+print('avg money left:', round(sum(moneys)  / len(moneys), 2))
 
