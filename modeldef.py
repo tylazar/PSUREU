@@ -35,7 +35,7 @@ def compute_aggregate(agent, p, q, mode, steps, time_weight, cost_weight):
 
         time = compute_pfh_time(dist, access)
         incon = access
-        cost = compute_pfh_cost(time, dist)
+        cost = compute_pfh_cost(agent, time, dist)
 
     if time_weight > 0:
         if cost_weight > 0:
@@ -79,9 +79,11 @@ def compute_transit_cost(agent, time):
     return cost
 
 
-def compute_pfh_cost(time, distance):
+def compute_pfh_cost(agent, time, distance):
     """Return the cost to travel for time by PfH."""
     rate = 1.25 + (0.32 * time) + (0.94 * distance) + 2.30
+    if agent.taxable:
+        rate += agent.model.tax_value
     tip = rate + 0.15 # add tip
     cost = (rate + tip)
     if cost < 5:
@@ -105,14 +107,14 @@ def pfh_percent(model):
 
 class TransModel(Model):
 
-    def __init__(self, N, width, height, taxVal):
+    def __init__(self, N, width, height, tax_val):
         self.num_agents = N
         self.grid = MultiGrid(width, height, True)
         self.schedule = RandomActivation(self)
         self.running = True
         self.steps = 0
-        self.tax_value = taxVal
-
+        self.tax_value = float(tax_val)
+        
         # create agents
         for i in range(self.num_agents):
             agent = TransAgent(i, self)
@@ -132,15 +134,15 @@ class TransModel(Model):
     def step(self):
         """Adance the model by one tick."""
         self.steps += 1
-        self.data_collector.collect(self)
         self.schedule.step()
+        self.data_collector.collect(self)
 
 
 # agents operating in the world
 class TransAgent(Agent):
 
-    def __init__(self, uniqueID, model):
-        super().__init__(uniqueID, model)
+    def __init__(self, unique_id, model):
+        super().__init__(unique_id, model)
         self.choice = 0
         self.time = uniform(91, 207)
         self.money = uniform(5, 39)
@@ -148,6 +150,7 @@ class TransAgent(Agent):
         self.pfh_prob = 1
         self.conv_weight = uniform(0, 1)
         self.day_pass = False
+        self.taxable = False
 
     def pick_mode(self, p, q):
         """Decide to take transit or PfH."""
@@ -215,6 +218,7 @@ class TransAgent(Agent):
         """Reset probabilities."""
         self.transit_prob = 1
         self.pfh_prob = 1
+        self.taxable = False
 
     def move(self):
         """Move from the current cell to a random cell."""
@@ -226,6 +230,15 @@ class TransAgent(Agent):
 
         # reset probabilities, pick transportation method and move
         self.reset()
+            
+        # check if origin or destination are within taxable area
+        # note: (0,0) is bottom left corner of grid
+        if (12 <= self.pos[0] <= 37
+                or 12 <= new_pos[0] <= 37
+                or 12 <= self.pos[1] <= 39
+                or 12 <= new_pos[1] <= 39):
+            self.taxable = True
+        
         self.pick_mode(self.pos, new_pos)
         self.model.grid.move_agent(self, new_pos)
 
